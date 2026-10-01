@@ -897,7 +897,7 @@ git commit -m "chore: make vault/daily the canonical work log path"
 - Create: `.claude/scripts/morning_brief_prompt.md`
 
 **Interfaces:**
-- Consumes: placeholders `{{RUN_DIR}}`, `{{DATE}}` (YYYY-MM-DD), `{{NOW}}` (HH:MM), substituted by Task 6's shell script before the prompt reaches `claude -p`.
+- Consumes: placeholders `{{RUN_DIR}}`, `{{DATE}}` (YYYY-MM-DD), `{{NOW}}` (HH:MM), `{{NOW_ISO}}` (full ISO-8601 with UTC offset, the run start), substituted by Task 6's shell script before the prompt reaches `claude -p`.
 - Consumes: `digest.md` (Task 2 shape), `gitlab.md` (existing `## Open Issues` list), `news.md` (Task 1 shape) inside `{{RUN_DIR}}`.
 - Produces: last stdout line `BRIEF_SENT`, `BRIEF_SENT NEWS_FAILED <reason>`, or `BRIEF_FAILED <reason>`; marker file; daily-log section; inbox file; `morning-brief-state.json`.
 
@@ -992,7 +992,7 @@ Print exactly one final line: `BRIEF_SENT`, or `BRIEF_SENT NEWS_FAILED <reason>`
 - [ ] **Step 2: Sanity-check placeholders**
 
 Run: `grep -o '{{[A-Z_]*}}' .claude/scripts/morning_brief_prompt.md | sort | uniq -c`
-Expected: exactly three placeholder names: `{{DATE}}`, `{{NOW}}`, `{{RUN_DIR}}`.
+Expected: exactly four placeholder names: `{{DATE}}`, `{{NOW}}`, `{{NOW_ISO}}`, `{{RUN_DIR}}`. (The prompt content was revised in Task 5's fix round 1; see the SDD ledger rulings dated 2026-10-01.)
 
 - [ ] **Step 3: Commit**
 
@@ -1011,7 +1011,7 @@ git commit -m "feat: add morning brief headless prompt"
 
 **Interfaces:**
 - Consumes: Task 1, 2 CLIs; `gitlab_integration.py issues`; Task 5 prompt with `{{RUN_DIR}}`, `{{DATE}}`, `{{NOW}}`.
-- Test hooks via environment: `MB_STATE_DIR` (state dir override), `MB_DATE` (YYYY-MM-DD), `MB_FAKE_NOW` (HHMM), `MB_FAKE_DOW` (1–7), `MB_SKIP_VPN=1`, `MB_SKIP_CLAUDE=1` (stop after gather, print `DRY_RUN`), `MB_CLAUDE_BIN`.
+- Test hooks via environment: `MB_STATE_DIR` (state dir override), `MB_DATE` (YYYY-MM-DD), `MB_FAKE_NOW` (HHMM), `MB_FAKE_NOW_ISO` (ISO-8601 override), `MB_FAKE_DOW` (1–7), `MB_SKIP_VPN=1`, `MB_SKIP_CLAUDE=1` (stop after gather, print `DRY_RUN`), `MB_CLAUDE_BIN`.
 - Log lines are `YYYY-MM-DD HH:MM:SS | <message>`; skip reasons are literally `skip: weekend`, `skip: outside window (HHMM)`, `skip: already sent today`, `skip: VPN down (probe <code>)`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1101,6 +1101,7 @@ STATE_DIR="${MB_STATE_DIR:-$PROJECT_DIR/.claude/data/state}"
 TODAY="${MB_DATE:-$(date +%Y-%m-%d)}"
 NOW_HHMM="${MB_FAKE_NOW:-$(date +%H%M)}"
 NOW_HM="${NOW_HHMM:0:2}:${NOW_HHMM:2:2}"
+NOW_ISO="${MB_FAKE_NOW_ISO:-$(date +%Y-%m-%dT%H:%M:%S%z)}"
 DOW="${MB_FAKE_DOW:-$(date +%u)}"
 PROBE_URL="${MB_PROBE_URL:-https://gitlab.ballys.tech/api/v4/version}"
 CLAUDE_BIN="${MB_CLAUDE_BIN:-$HOME/.local/bin/claude}"
@@ -1154,7 +1155,7 @@ fi
 
 if [[ ! -x "$CLAUDE_BIN" ]]; then log "fail: claude binary not found at $CLAUDE_BIN"; exit 1; fi
 
-prompt="$(sed -e "s|{{RUN_DIR}}|$RUN_DIR|g" -e "s|{{DATE}}|$TODAY|g" -e "s|{{NOW}}|$NOW_HM|g" "$PROMPT_FILE")"
+prompt="$(sed -e "s|{{RUN_DIR}}|$RUN_DIR|g" -e "s|{{DATE}}|$TODAY|g" -e "s|{{NOW}}|$NOW_HM|g" -e "s|{{NOW_ISO}}|$NOW_ISO|g" "$PROMPT_FILE")"
 
 log "run: claude -p"
 set +e
