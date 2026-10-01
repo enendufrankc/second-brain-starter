@@ -12,5 +12,5 @@ case "${FAKE_CLAUDE_MODE:-ok}" in
   ok)      echo "did things"; echo "BRIEF_SENT"; exit 0 ;;
   notoken) echo "did things but no sentinel"; exit 0 ;;
   fail)    echo "BRIEF_FAILED boom"; exit 1 ;;
-  hang)    sleep 30; echo "BRIEF_SENT"; exit 0 ;;
+  hang)    exec sleep 30 ;;
 esac

@@ -136,6 +136,13 @@ class ClaudeRunTests(unittest.TestCase):
         self.assertTrue(claude_err.exists())
         self.assertIn("watchdog: killed claude", claude_err.read_text())
 
+    def test_watchdog_is_cancelled_after_normal_exit(self):
+        rc, out = run({**self.base, "FAKE_CLAUDE_MODE": "ok", "MB_CLAUDE_TIMEOUT": "20"})
+        self.assertEqual(rc, 0)
+        # Verify watchdog process is cleaned up: pgrep should find no "sleep 20" process
+        pgrep_result = subprocess.run(["pgrep", "-f", "sleep 20"], capture_output=True)
+        self.assertEqual(pgrep_result.returncode, 1, "watchdog sleep process should not be running")
+
 
 if __name__ == "__main__":
     unittest.main()

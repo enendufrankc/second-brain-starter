@@ -93,8 +93,12 @@ set +e
     </dev/null >"$RUN_DIR/claude.out" 2>>"$RUN_DIR/claude.err" &
   claude_pid=$!
   ( sleep "$CLAUDE_TIMEOUT"; kill -9 "$claude_pid" 2>/dev/null && echo "watchdog: killed claude after ${CLAUDE_TIMEOUT}s" >>"$RUN_DIR/claude.err" ) >/dev/null 2>&1 &
+  watchdog_pid=$!
   wait "$claude_pid"
   rc=$?
+  pkill -P "$watchdog_pid" 2>/dev/null || true
+  kill "$watchdog_pid" 2>/dev/null || true
+  wait "$watchdog_pid" 2>/dev/null || true
   set -e
   out="$(cat "$RUN_DIR/claude.out")"
 }
