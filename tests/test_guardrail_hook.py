@@ -53,5 +53,14 @@ class ConnectorSendTests(unittest.TestCase):
         self.assertEqual(out["decision"], "block")
 
 
+class WriteRootTests(unittest.TestCase):
+    def test_write_to_claude_memory_dir_allowed(self):
+        path = "/Users/frank.enendu/.claude/projects/-Users-frank-enendu-Documents-Personal-Second-Brain-Starter/memory/note.md"
+        self.assertEqual(run_hook("Write", {"file_path": path, "content": "x"}), {"decision": "allow"})
+
+    def test_write_to_home_root_still_blocked(self):
+        self.assertEqual(run_hook("Write", {"file_path": "/Users/frank.enendu/other.md", "content": "x"})["decision"], "block")
+
+
 if __name__ == "__main__":
     unittest.main()

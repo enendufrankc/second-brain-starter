@@ -97,6 +97,7 @@ def check_file_write(filepath: str) -> dict:
     allowed_roots = [
         "/Users/frank.enendu/Documents/Personal/Second Brain Starter",
         "/Users/frank.enendu/Documents/Projects",
+        "/Users/frank.enendu/.claude/projects",  # Claude Code per-project memory
         "/sessions/",  # Cowork sandbox
     ]
     is_allowed = any(filepath.startswith(root) for root in allowed_roots)
