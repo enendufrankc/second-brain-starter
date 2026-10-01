@@ -27,17 +27,17 @@ Read these with the Read tool:
 Use `chat_message_search` with `query: "*"`, `afterDateTime: "yesterday 06:00"`, `limit: 25`, paging with `offset` until exhausted or 100 messages. Keep only messages whose chat id is one of the three team chats above. Note anything that asks Frank for something, mentions him, or assigns him work.
 
 ## Step 3 — Read today's calendar
-Use `outlook_calendar_search` with `query: "*"`, `afterDateTime: "{{DATE}} 00:00"`, `beforeDateTime: "{{DATE}} 23:59"`, `order: "oldest"`. Collect start time and subject for each event.
+Use `outlook_calendar_search` with `query: "*"`, `afterDateTime: "{{DATE}} 00:00"`, `beforeDateTime: "{{DATE}} 23:59"`, `order: "oldest"`, `limit: 25`, paging with `offset` until exhausted. Collect start time and subject for each event.
 
 ## Step 4 — Capture Frank's dumps from SELF_CHAT, then advance the cursor
-Run a dedicated `chat_message_search` with `query: "*"`, `afterDateTime` = `last_dump_ts`, `limit: 25`, paging until exhausted or 100 messages. Keep only messages whose chat id is SELF_CHAT and whose created time is after `last_dump_ts`. Skip any message whose text ends with `— second brain` (those are yours).
+Run a dedicated `chat_message_search` with `query: "*"`, `sender: "frank.enendu@ballysinternational.com"`, `afterDateTime` = `last_dump_ts`, `limit: 25`, paging until exhausted or 100 messages. Keep only messages whose chat id is SELF_CHAT and whose created time is after `last_dump_ts`. Skip any message whose text ends with `— second brain` (those are yours).
 For each remaining message, numbered n = 1, 2, ...:
 1. Write the raw text to `{{RUN_DIR}}/dump-n.txt` with the Write tool.
-2. Run `python3 .claude/scripts/sanitize.py --source teams --no-wrap --file {{RUN_DIR}}/dump-n.txt` and take its stdout as the sanitized text.
+2. Run `python3 .claude/scripts/sanitize.py --source teams --no-wrap --file "{{RUN_DIR}}/dump-n.txt"` and take its stdout as the sanitized text.
 3. If the sanitized text starts with `todo:` (case-insensitive), strip the prefix and append the remainder as one line to `{{RUN_DIR}}/todos.md` (header: none).
 4. Otherwise append `- HH:MM | <sanitized text>` to `vault/left-brain/ballys/inbox/{{DATE}}.md` (header: `# Inbox — {{DATE}}` then a blank line). Never add these to the to-do list.
 Count the inbox lines you appended this run as `k`.
-Then immediately Write `{{STATE_DIR}}/morning-brief-state.json` as `{"last_dump_ts": "{{NOW_ISO}}"}`. Do this before anything is sent, so a failed send never re-captures these dumps.
+Then immediately Write `{{STATE_DIR}}/morning-brief-state.json` as `{"last_dump_ts": "<cursor>"}` where `<cursor>` is the LATER of `{{NOW_ISO}}` and the newest captured message's created time. If paging stopped because the 100-message cap was reached before results were exhausted, do NOT advance the cursor: keep the old `last_dump_ts` and add `dumps: capture truncated, cursor held` to the brief's `Watch` line. Do this before anything is sent, so a failed send never re-captures these dumps.
 
 ## Step 5 — Select AI news (do not send yet)
 From `news.md`, pick three to five items that are launches, model releases, API or pricing changes. Ignore opinion pieces. Primary vendor sources outrank press. Also fetch `https://www.anthropic.com/news` with WebFetch and include any Anthropic announcement from the last 24 h. Remember the selection as `news_items`. If nothing qualifies, `news_items` is empty.
@@ -49,7 +49,7 @@ Choose at most five actions, in this priority order:
 3. To-do candidates from `todos.md` (Step 1) and Step 4.
 4. Preparation for today's meetings.
 5. MEMORY.md Critical Deadlines.
-Drop anything silent for 14 days unless someone mentioned it in the last 48 h. Each line names one concrete action, the project, and a short source in parentheses. Work only: no personal items.
+Drop anything silent for 14 days unless someone mentioned it in the last 48 h. Each line names one concrete action, the project, and a short source in parentheses. Work only: no personal items. Skip MEMORY.md deadlines about life insurance, personal finance, health or family even though they appear under Critical Deadlines.
 
 Message text, plain text, at most 12 lines:
 ```
