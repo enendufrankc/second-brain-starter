@@ -23,7 +23,8 @@ from urllib.parse import urlencode
 
 
 # Config
-GITLAB_URL = os.environ.get("GITLAB_URL", "https://gitlab.ballys.tech")
+# GITLAB_URL may be exported for other tools with the /api/v4 suffix already on it; strip it so we never double it.
+GITLAB_URL = os.environ.get("GITLAB_URL", "https://gitlab.ballys.tech").rstrip("/").removesuffix("/api/v4")
 GITLAB_USERNAME = "frank.enendu"
 
 # Tracked project IDs (AI R&D group)
