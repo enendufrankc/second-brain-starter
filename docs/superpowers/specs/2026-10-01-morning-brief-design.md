@@ -216,3 +216,20 @@ Retire the Cowork "AI News Briefing" task so `vault/daily/ai-news-*.md` has one 
 - Reading meeting transcripts (scope is granted, but historically produced nothing; separate task).
 - Per-repo SessionStart status hooks in Ballys codebases (separate task).
 - Any change to Cowork scheduled tasks.
+
+## Implementation notes (2026-10-01)
+
+- `claude` 2.1.286 has no `--max-turns`; the run is bounded by the prompt's step list instead.
+- Teams `read_resource` reads a single message by id, so `chat_message_search` is the primary chat reader.
+- Run dir, date and time reach the prompt by `{{RUN_DIR}}`, `{{DATE}}`, `{{NOW}}` substitution, not environment variables.
+- Agent posts are authored by Frank's account. Re-ingestion is prevented by advancing `last_dump_ts` to the send time and by the `— second brain` trailer.
+- Anthropic has no RSS feed; the prompt fetches anthropic.com/news directly.
+- All morning-brief state (sent marker, news marker, `morning-brief-state.json`, per-day run dirs) lives in `.morning-brief/` at the project root (gitignored), not `.claude/data/state/`: headless `claude -p` cannot write under `.claude/`, which the first live run proved. The prompt receives it as `{{STATE_DIR}}`.
+- The headless `claude` call runs under a watchdog (`MB_CLAUDE_TIMEOUT`, default 900 s) that is cancelled when the run exits normally; without it a hung run would block every later launchd tick.
+- `last_dump_ts` is written at the end of the dump-capture step, before any send, and `todo:` candidates are persisted to the run dir, so a failed send never re-captures or loses dumps.
+- A second marker, `morning-brief-news-sent-<date>`, makes the AI news message idempotent on retry.
+- News selection happens before the brief is composed so the `Watch` line can say "AI news: no items" truthfully.
+- Agent messages end with the trailer `— second brain`; because the connector posts as Frank, that trailer plus the advanced cursor is how the agent's own posts are excluded from dump capture.
+- Observed on the first live run (2026-10-01 11:20): `chat_message_search` with `query: "*"` returned bot and workflow posts up to its 100-message cap and none of the three team chats; the brief fell back to the daily log. A per-chat read may be needed if this recurs in the 06:30–11:00 window. Also GitLab reported "No open issues assigned" while MEMORY.md lists four overdue issues, which suggests `GITLAB_PAT` has expired; the integration returns an empty list on auth errors rather than failing.
+- The Microsoft AI RSS feed was removed (HTTP 410; Azure fallback timed out). Seven feeds remain.
+- The pre-existing untracked files `.claude/scripts/integrations/*.py` and `.claude/scripts/sanitize.py` are required by the runner but were deliberately NOT committed on this branch (they contain colleague names and the remote is public GitHub); Frank decides whether to commit them.

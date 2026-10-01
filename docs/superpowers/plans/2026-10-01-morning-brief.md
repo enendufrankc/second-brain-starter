@@ -893,6 +893,8 @@ git commit -m "chore: make vault/daily the canonical work log path"
 
 ### Task 5: Headless run prompt
 
+**Superseded:** the prompt text embedded in Step 1 below is the original. The committed `.claude/scripts/morning_brief_prompt.md` (commits 7d35d22 and 9567abe) is authoritative; it reorders news selection before composition, writes the dump cursor before sending, uses `{{NOW_ISO}}` and `{{STATE_DIR}}`, and defines append semantics. See the spec's Implementation notes.
+
 **Files:**
 - Create: `.claude/scripts/morning_brief_prompt.md`
 
