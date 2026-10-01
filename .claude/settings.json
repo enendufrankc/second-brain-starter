@@ -29,6 +29,16 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/pre-tool-guardrail.py"
+          }
+        ]
+      }
     ]
   }
 }
