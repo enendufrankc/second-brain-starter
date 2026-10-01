@@ -112,6 +112,12 @@ class ClaudeRunTests(unittest.TestCase):
         marker = Path(self.base["MB_STATE_DIR"], "morning-brief-sent-2026-10-01")
         self.assertFalse(marker.exists())
 
+    def test_sentinel_must_be_last_line(self):
+        rc, out = run({**self.base, "FAKE_CLAUDE_MODE": "midtoken"})
+        self.assertEqual(rc, 1)
+        marker = Path(self.base["MB_STATE_DIR"], "morning-brief-sent-2026-10-01")
+        self.assertFalse(marker.exists())
+
     def test_state_dir_placeholder_substituted(self):
         run({**self.base, "FAKE_CLAUDE_MODE": "ok"})
         argv = self.argv_file.read_text()
@@ -125,6 +131,9 @@ class ClaudeRunTests(unittest.TestCase):
         self.assertNotIn("{{", argv_content)
         self.assertIn("run-2026-10-01", argv_content)
         self.assertIn("--allowedTools", argv_content)
+        self.assertIn("--setting-sources", argv_content)
+        self.assertIn("project", argv_content)
+        self.assertIn("--disallowedTools", argv_content)
         self.assertIn("mcp__claude_ai_Microsoft_365__teams_send_chat_message", argv_content)
 
     def test_missing_binary_fails_with_log(self):

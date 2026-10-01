@@ -2,6 +2,7 @@
 # Morning brief runner. Design: docs/superpowers/specs/2026-10-01-morning-brief-design.md
 # launchd calls this every 10 minutes. It exits fast unless the gate passes,
 # then gathers inputs and runs one headless Claude session that posts to Teams.
+# The headless run uses --setting-sources project (drops user/local allow-lists, keeps project hooks) and disallows the gitlab/playwright/github MCP servers.
 # State (markers, cursor, run dirs) lives in .morning-brief/, not .claude/: headless claude cannot write under .claude/.
 # Environment: MB_STATE_DIR, MB_DATE, MB_FAKE_NOW, MB_FAKE_NOW_ISO, MB_FAKE_DOW, MB_SKIP_VPN,
 # MB_SKIP_CLAUDE (dry-run), MB_SKIP_GATHER (test mode: skip collectors), MB_CLAUDE_BIN, MB_CLAUDE_TIMEOUT
@@ -15,7 +16,7 @@ STATE_DIR="${MB_STATE_DIR:-$PROJECT_DIR/.morning-brief}"
 TODAY="${MB_DATE:-$(date +%Y-%m-%d)}"
 NOW_HHMM="${MB_FAKE_NOW:-$(date +%H%M)}"
 NOW_HM="${NOW_HHMM:0:2}:${NOW_HHMM:2:2}"
-NOW_ISO="${MB_FAKE_NOW_ISO:-$(date +%Y-%m-%dT%H:%M:%S%z)}"
+NOW_ISO="${MB_FAKE_NOW_ISO:-$(date +%Y-%m-%dT%H:%M:%S%z | sed 's/\(..\)$/:\1/')}"
 DOW="${MB_FAKE_DOW:-$(date +%u)}"
 PROBE_URL="${MB_PROBE_URL:-https://gitlab.ballys.tech/api/v4/version}"
 CLAUDE_BIN="${MB_CLAUDE_BIN:-$HOME/.local/bin/claude}"
@@ -85,6 +86,8 @@ log "run: claude -p (timeout ${CLAUDE_TIMEOUT}s)"
 set +e
 {
   "$CLAUDE_BIN" -p "$prompt" --output-format text \
+    --setting-sources project \
+    --disallowedTools "mcp__gitlab" "mcp__playwright" "mcp__github" \
     --allowedTools "Read" "Write" "Edit" "Bash(python3 .claude/scripts/sanitize.py:*)" \
       "WebFetch(domain:www.anthropic.com)" \
       "mcp__claude_ai_Microsoft_365__chat_message_search" \
@@ -93,7 +96,7 @@ set +e
       "mcp__claude_ai_Microsoft_365__teams_send_chat_message" \
     </dev/null >"$RUN_DIR/claude.out" 2>>"$RUN_DIR/claude.err" &
   claude_pid=$!
-  ( sleep "$CLAUDE_TIMEOUT"; kill -9 "$claude_pid" 2>/dev/null && echo "watchdog: killed claude after ${CLAUDE_TIMEOUT}s" >>"$RUN_DIR/claude.err" ) >/dev/null 2>&1 &
+  ( sleep "$CLAUDE_TIMEOUT" && kill -9 "$claude_pid" 2>/dev/null && echo "watchdog: killed claude after ${CLAUDE_TIMEOUT}s" >>"$RUN_DIR/claude.err" ) >/dev/null 2>&1 &
   watchdog_pid=$!
   wait "$claude_pid"
   rc=$?
@@ -104,7 +107,7 @@ set +e
   out="$(cat "$RUN_DIR/claude.out")"
 }
 
-if (( rc == 0 )) && grep -q 'BRIEF_SENT' <<<"$out"; then
+if (( rc == 0 )) && [[ "$(tail -n 1 <<<"$out")" == BRIEF_SENT* ]]; then
   touch "$MARKER"
   log "done: brief sent ($(tail -n 1 <<<"$out"))"
   exit 0
