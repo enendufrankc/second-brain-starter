@@ -1,7 +1,7 @@
 # Morning Brief — Design
 
 Date: 2026-10-01
-Status: approved in conversation, awaiting written-spec review
+Status: approved 2026-10-01 (incl. AI news addition)
 Diagram: https://claude.ai/artifact/GZRNaQbTT8zj9d2AjPPtx7
 
 ## Goal
@@ -55,6 +55,7 @@ Gather, into a per-run temp dir under `.claude/data/state/run-YYYY-MM-DD/`:
 
 - `digest.md` from `python3 .claude/scripts/sessions_digest.py --hours 36`. If the script fails, write one line: `Session digest unavailable.`
 - `gitlab.md` from `python3 .claude/scripts/integrations/gitlab_integration.py issues`. If it fails (missing or expired token), write one line: `GitLab unavailable: check GITLAB_PAT.`
+- `news.md` from `python3 .claude/scripts/news_digest.py --hours 24`. If it fails or returns no items, write one line: `AI news unavailable.`
 
 Run:
 
@@ -92,11 +93,35 @@ Per file: collect user turns (string content or `text` blocks; skip `tool_result
 
 A file that fails to parse is skipped with a warning line at the end of the output. `--json` emits the same structure as JSON.
 
+### 3b. `.claude/scripts/news_digest.py` (new, LLM-free)
+
+Fetches RSS or Atom feeds with the standard library only (`urllib`, `xml.etree`), 10 s timeout per feed, feeds fetched sequentially. Keeps items published in the last `--hours` (default 24), de-duplicates by link, and emits markdown to stdout, newest first:
+
+```
+## <Source>
+- <ISO time> | <title> | <link>
+```
+
+Sources are a module-level list of `(name, url)` pairs, primary vendors first. Initial list, each URL to be validated during implementation and dropped if dead:
+
+| Source | Why |
+|---|---|
+| Anthropic news | Claude releases, API changes |
+| OpenAI news | GPT releases, API changes |
+| Google DeepMind blog | Gemini, research |
+| Google AI blog | Product launches |
+| Microsoft AI blog | Copilot, Azure AI |
+| Hugging Face blog | Open models, tooling |
+| Simon Willison's weblog | Independent, fast, accurate |
+| Ars Technica AI | Press coverage of launches |
+
+A feed that fails is skipped with a warning line at the end of the output. Zero items overall exits 0 with the single line `No items in the last 24 h.` `--json` emits the same structure as JSON.
+
 ### 4. `.claude/scripts/morning_brief_prompt.md` (new)
 
 The instructions for the headless run. Steps, in order:
 
-1. Read `MB_RUN_DIR/digest.md`, `MB_RUN_DIR/gitlab.md`, the `## Critical Deadlines` section of `vault/MEMORY.md`, and `vault/daily/MB_DATE.md` if it exists.
+1. Read `MB_RUN_DIR/digest.md`, `MB_RUN_DIR/gitlab.md`, `MB_RUN_DIR/news.md`, the `## Critical Deadlines` section of `vault/MEMORY.md`, and `vault/daily/MB_DATE.md` if it exists.
 2. Read `.claude/data/state/morning-brief-state.json` (`{"last_dump_ts": ISO-8601}`; treat a missing file as 24 h ago).
 3. Read the three team chats since yesterday 06:00 via `read_resource` on `teams:///chats/<id>/messages`; if that resource is unavailable, fall back to `chat_message_search` with `afterDateTime` and keep only results from those three chats.
 4. Read today's calendar via `outlook_calendar_search`.
@@ -117,9 +142,18 @@ Captured <k> notes
 8. Immediately write the marker file `.claude/data/state/morning-brief-sent-MB_DATE`.
 9. Append to `vault/daily/MB_DATE.md` a section `## Morning Brief (HH:MM)` containing the brief plus one evidence line per item (chat, session, calendar or MEMORY). Append-only: never edit earlier content. Create the file with the standard daily-log header if absent.
 10. Update `morning-brief-state.json` with the newest self-chat message timestamp seen.
-11. Print `BRIEF_SENT` as the last line of output.
+11. AI news. From `news.md`, pick three to five items that are launches, model releases, API changes or pricing changes. Ignore opinion pieces. Primary vendor sources outrank press. Send a second message to the self-chat:
 
-If step 7 fails, do not write the marker, print `BRIEF_FAILED <reason>`, and stop.
+```
+AI news · <Weekday> <d> <Mon>
+• <Source>: <headline> — <link>
+… three to five lines
+```
+
+    Then write the full filtered list to `vault/daily/ai-news-MB_DATE.md` using the same layout the existing Cowork AI News task produces (title line, then one bullet per item with source, headline, link). If `news.md` is the unavailable placeholder or has no qualifying items, send no news message and add `AI news: no items` to the `Watch` line of the brief instead. A news failure never blocks the to-do brief.
+12. Print `BRIEF_SENT` as the last line of output.
+
+If step 7 fails, do not write the marker, print `BRIEF_FAILED <reason>`, and stop. If step 11 fails after step 7 succeeded, print `BRIEF_SENT NEWS_FAILED <reason>`; the marker stands.
 
 ### 5. `.claude/hooks/pre-tool-guardrail.py` (edit)
 
@@ -154,11 +188,12 @@ Rule 1 changes from "never send emails or Teams messages" to "never send emails;
 | `.claude/data/state/run-YYYY-MM-DD/` | shell | `digest.md`, `gitlab.md`, kept for debugging; older than 7 days deleted by the shell at the start of each run |
 | `vault/daily/YYYY-MM-DD.md` | prompt | `## Morning Brief (HH:MM)` section, append-only |
 | `vault/left-brain/ballys/inbox/YYYY-MM-DD.md` | prompt | `- HH:MM \| text` lines |
+| `vault/daily/ai-news-YYYY-MM-DD.md` | prompt | filtered news list, same layout as the Cowork task's file |
 
 ## Error handling
 
 - Any gate failure: exit 0, one log line, next tick retries. After 11:00 nothing runs until the next weekday.
-- Digest or GitLab gather failure: continue with the one-line placeholder; the brief says so in `Watch`.
+- Digest, GitLab or news gather failure: continue with the one-line placeholder; the brief says so in `Watch`.
 - Claude non-zero exit or missing `BRIEF_SENT`: no marker, log the tail of output, retry next tick. The in-prompt marker write prevents a second post if the send itself succeeded.
 - Connector auth expired: the send fails, `BRIEF_FAILED` is printed, and the error log names the tool. Frank re-authenticates the Microsoft 365 connector in Claude.
 
@@ -169,6 +204,11 @@ Rule 1 changes from "never send emails or Teams messages" to "never send emails;
 3. Hook: a fake `teams_send_chat_message` payload to the AI R&D Crew id returns block; to the self-chat id returns allow; a fake `outlook_send_mail` returns block.
 4. `launchctl load` the plist, then the next tick's log line reads `already sent today`.
 5. `./deploy/status.sh` shows the new plist loaded.
+6. `python3 .claude/scripts/news_digest.py` returns at least one item from at least five of the eight feeds, and the `--force` run in step 2 also posts the AI news message and writes `vault/daily/ai-news-<date>.md`.
+
+## Follow-up after one clean week
+
+Retire the Cowork "AI News Briefing" task so `vault/daily/ai-news-*.md` has one writer.
 
 ## Out of scope
 
