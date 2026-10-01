@@ -37,6 +37,13 @@ class ConnectorSendTests(unittest.TestCase):
         self.assertEqual(run_hook(M365 + "chat_message_search", {"query": "*"}), {"decision": "allow"})
         self.assertEqual(run_hook("Read", {"file_path": "/etc/hosts"}), {"decision": "allow"})
 
+    def test_teams_send_with_null_tool_input_blocked(self):
+        payload = json.dumps({"tool_name": M365 + "teams_send_chat_message", "tool_input": None})
+        proc = subprocess.run([sys.executable, str(HOOK)], input=payload, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0)
+        out = json.loads(proc.stdout)
+        self.assertEqual(out["decision"], "block")
+
 
 if __name__ == "__main__":
     unittest.main()

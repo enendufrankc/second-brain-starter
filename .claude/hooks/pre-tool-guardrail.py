@@ -108,6 +108,8 @@ def main():
 
     tool_name = payload.get("tool_name", "")
     tool_input = payload.get("tool_input", {})
+    if not isinstance(tool_input, dict):
+        tool_input = {}
 
     # Check Bash commands
     if tool_name == "Bash":
