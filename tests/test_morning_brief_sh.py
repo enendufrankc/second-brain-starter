@@ -112,6 +112,12 @@ class ClaudeRunTests(unittest.TestCase):
         marker = Path(self.base["MB_STATE_DIR"], "morning-brief-sent-2026-10-01")
         self.assertFalse(marker.exists())
 
+    def test_state_dir_placeholder_substituted(self):
+        run({**self.base, "FAKE_CLAUDE_MODE": "ok"})
+        argv = self.argv_file.read_text()
+        self.assertIn(self.tmp.name, argv)
+        self.assertNotIn("{{STATE_DIR}}", argv)
+
     def test_placeholders_substituted_and_tools_passed(self):
         rc, out = run({**self.base, "FAKE_CLAUDE_MODE": "ok"})
         self.assertEqual(rc, 0)

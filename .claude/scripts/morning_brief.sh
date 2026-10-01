@@ -2,6 +2,7 @@
 # Morning brief runner. Design: docs/superpowers/specs/2026-10-01-morning-brief-design.md
 # launchd calls this every 10 minutes. It exits fast unless the gate passes,
 # then gathers inputs and runs one headless Claude session that posts to Teams.
+# State (markers, cursor, run dirs) lives in .morning-brief/, not .claude/: headless claude cannot write under .claude/.
 # Environment: MB_STATE_DIR, MB_DATE, MB_FAKE_NOW, MB_FAKE_NOW_ISO, MB_FAKE_DOW, MB_SKIP_VPN,
 # MB_SKIP_CLAUDE (dry-run), MB_SKIP_GATHER (test mode: skip collectors), MB_CLAUDE_BIN, MB_CLAUDE_TIMEOUT
 set -euo pipefail
@@ -10,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_DIR"
 
-STATE_DIR="${MB_STATE_DIR:-$PROJECT_DIR/.claude/data/state}"
+STATE_DIR="${MB_STATE_DIR:-$PROJECT_DIR/.morning-brief}"
 TODAY="${MB_DATE:-$(date +%Y-%m-%d)}"
 NOW_HHMM="${MB_FAKE_NOW:-$(date +%H%M)}"
 NOW_HM="${NOW_HHMM:0:2}:${NOW_HHMM:2:2}"
@@ -77,7 +78,7 @@ if [[ ! -x "$CLAUDE_BIN" ]]; then log "fail: claude binary not found at $CLAUDE_
 
 if [[ ! -f "$PROMPT_FILE" ]]; then log "fail: prompt file not found at $PROMPT_FILE"; exit 1; fi
 
-prompt="$(sed -e "s|{{RUN_DIR}}|$RUN_DIR|g" -e "s|{{DATE}}|$TODAY|g" -e "s|{{NOW}}|$NOW_HM|g" -e "s|{{NOW_ISO}}|$NOW_ISO|g" "$PROMPT_FILE")"
+prompt="$(sed -e "s|{{RUN_DIR}}|$RUN_DIR|g" -e "s|{{STATE_DIR}}|$STATE_DIR|g" -e "s|{{DATE}}|$TODAY|g" -e "s|{{NOW}}|$NOW_HM|g" -e "s|{{NOW_ISO}}|$NOW_ISO|g" "$PROMPT_FILE")"
 
 CLAUDE_TIMEOUT="${MB_CLAUDE_TIMEOUT:-900}"
 log "run: claude -p (timeout ${CLAUDE_TIMEOUT}s)"

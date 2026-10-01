@@ -11,7 +11,7 @@ You are Frank's second brain running unattended at {{NOW}} on {{DATE}} (run star
 - R&D Stand up meeting chat: `19:meeting_OGNlZjZhMWItMDQ2OS00M2ZlLTljOTUtNzA5MWZiNjQ1NDdk@thread.v2`
 - AI Interlock Team: `19:762ccb646d3447e7aec650273198e595@thread.v2`
 - AI R&D Crew: `19:02a862626ca54619b6babc5593aa33a3@thread.v2`
-- State dir: `.claude/data/state/`
+- State dir: `{{STATE_DIR}}/` (outside `.claude/`, which headless Claude Code refuses to write to)
 
 ## Step 1 — Read local inputs
 Read these with the Read tool:
@@ -21,7 +21,7 @@ Read these with the Read tool:
 - `{{RUN_DIR}}/todos.md` if it exists — `todo:` items captured by an earlier attempt today. Each line is a to-do candidate with source `(you)`.
 - `vault/MEMORY.md` — only the `## Critical Deadlines` section matters.
 - `vault/daily/{{DATE}}.md` if it exists — a Cowork task may already have written something today.
-- `.claude/data/state/morning-brief-state.json` if it exists — `{"last_dump_ts": "<ISO-8601>"}`. If missing, use 24 h before {{NOW_ISO}}.
+- `{{STATE_DIR}}/morning-brief-state.json` if it exists — `{"last_dump_ts": "<ISO-8601>"}`. If missing, use 24 h before {{NOW_ISO}}.
 
 ## Step 2 — Read the team chats
 Use `chat_message_search` with `query: "*"`, `afterDateTime: "yesterday 06:00"`, `limit: 25`, paging with `offset` until exhausted or 100 messages. Keep only messages whose chat id is one of the three team chats above. Note anything that asks Frank for something, mentions him, or assigns him work.
@@ -37,7 +37,7 @@ For each remaining message, numbered n = 1, 2, ...:
 3. If the sanitized text starts with `todo:` (case-insensitive), strip the prefix and append the remainder as one line to `{{RUN_DIR}}/todos.md` (header: none).
 4. Otherwise append `- HH:MM | <sanitized text>` to `vault/left-brain/ballys/inbox/{{DATE}}.md` (header: `# Inbox — {{DATE}}` then a blank line). Never add these to the to-do list.
 Count the inbox lines you appended this run as `k`.
-Then immediately Write `.claude/data/state/morning-brief-state.json` as `{"last_dump_ts": "{{NOW_ISO}}"}`. Do this before anything is sent, so a failed send never re-captures these dumps.
+Then immediately Write `{{STATE_DIR}}/morning-brief-state.json` as `{"last_dump_ts": "{{NOW_ISO}}"}`. Do this before anything is sent, so a failed send never re-captures these dumps.
 
 ## Step 5 — Select AI news (do not send yet)
 From `news.md`, pick three to five items that are launches, model releases, API or pricing changes. Ignore opinion pieces. Primary vendor sources outrank press. Also fetch `https://www.anthropic.com/news` with WebFetch and include any Anthropic announcement from the last 24 h. Remember the selection as `news_items`. If nothing qualifies, `news_items` is empty.
@@ -65,7 +65,7 @@ Omit the `Captured` line when k is 0. Omit `Meetings:` when there are none. Keep
 
 ## Step 7 — Send the brief, then mark
 Call `teams_send_chat_message` with `chatId` = SELF_CHAT, `bodyType: "text"`, `body` = the message. If the call fails, print `BRIEF_FAILED <reason>` as your final line and stop. Do not write the marker.
-On success, immediately Write the empty file `.claude/data/state/morning-brief-sent-{{DATE}}`.
+On success, immediately Write the empty file `{{STATE_DIR}}/morning-brief-sent-{{DATE}}`.
 
 ## Step 8 — Daily log
 Append to `vault/daily/{{DATE}}.md` (header: `# {{DATE}} — Daily Log` then a blank line) this section:
@@ -79,7 +79,7 @@ Evidence:
 ```
 
 ## Step 9 — AI news message and file
-Skip this whole step if `news_items` is empty or if `.claude/data/state/morning-brief-news-sent-{{DATE}}` already exists.
+Skip this whole step if `news_items` is empty or if `{{STATE_DIR}}/morning-brief-news-sent-{{DATE}}` already exists.
 Send a second message to SELF_CHAT:
 ```
 AI news · <Weekday> <d> <Mon>
@@ -87,7 +87,7 @@ AI news · <Weekday> <d> <Mon>
 • ...
 — second brain
 ```
-On success, immediately Write the empty file `.claude/data/state/morning-brief-news-sent-{{DATE}}`. Then Write `vault/daily/ai-news-{{DATE}}.md` with frontmatter `type: daily-briefing`, `topic: ai-news`, `date: {{DATE}}`, a heading `# AI News Briefing — <d> <Mon> <YYYY>`, and one bullet per selected item in the form `- **<headline>** — <one sentence why it matters>. [<Source>](<link>)`. If anything in this step fails, remember `NEWS_FAILED <reason>` for Step 10; the brief marker from Step 7 stands.
+On success, immediately Write the empty file `{{STATE_DIR}}/morning-brief-news-sent-{{DATE}}`. Then Write `vault/daily/ai-news-{{DATE}}.md` with frontmatter `type: daily-briefing`, `topic: ai-news`, `date: {{DATE}}`, a heading `# AI News Briefing — <d> <Mon> <YYYY>`, and one bullet per selected item in the form `- **<headline>** — <one sentence why it matters>. [<Source>](<link>)`. If anything in this step fails, remember `NEWS_FAILED <reason>` for Step 10; the brief marker from Step 7 stands.
 
 ## Step 10 — Report
 Print exactly one final line: `BRIEF_SENT`, or `BRIEF_SENT NEWS_FAILED <reason>` if Step 9 failed. (`BRIEF_FAILED <reason>` is only ever printed by Step 7.)
