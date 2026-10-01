@@ -97,6 +97,24 @@ class DigestTests(unittest.TestCase):
         self.assertEqual(sd.truncate("a   b\n\nc", 300), "a b c")
         self.assertEqual(len(sd.truncate("x" * 400, 300)), 300)
 
+    def test_sibling_directory_with_shared_prefix_excluded(self):
+        work_client = self.home / "Documents" / "Work-client" / "repo-x"
+        work_client.mkdir(parents=True)
+        self.write(self.claude / "slug-a" / "s5.jsonl", [claude_line("user", "client work", str(work_client))])
+        repos = sd.collect(self.claude, self.codex, hours=36, home=self.home, now=time.time())
+        self.assertEqual(repos, [])
+
+    def test_collect_with_warnings_returns_tuple(self):
+        self.write(self.claude / "slug-a" / "s6.jsonl", [claude_line("user", "test", str(self.work))])
+        result = sd.collect_with_warnings(self.claude, self.codex, hours=36, home=self.home, now=time.time())
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        repos, warnings = result
+        self.assertIsInstance(repos, list)
+        self.assertIsInstance(warnings, list)
+        collect_result = sd.collect(self.claude, self.codex, hours=36, home=self.home, now=time.time())
+        self.assertEqual(repos, collect_result)
+
 
 if __name__ == "__main__":
     unittest.main()

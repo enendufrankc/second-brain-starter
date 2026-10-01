@@ -15,12 +15,11 @@ Usage:
 import argparse
 import json
 import re
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
-INCLUDE_PREFIXES = ("Documents/Work", "Documents/Projects")
+INCLUDE_ROOTS = {("Documents", "Work"), ("Documents", "Projects")}
 NOISE_PREFIXES = (
     "<system-reminder>", "<command-name>", "<command-message>", "<local-command",
     "<skills_instructions>", "<environment_context>", "# AGENTS.md instructions",
@@ -105,11 +104,11 @@ def in_scope(cwd: str, home: Path) -> bool:
         rel = Path(cwd).resolve().relative_to(home.resolve()).as_posix()
     except ValueError:
         return False
-    return rel.startswith(INCLUDE_PREFIXES)
+    return Path(rel).parts[:2] in INCLUDE_ROOTS
 
 
-def collect(claude_dir: Path, codex_dir: Path, hours: int, home: Path, now: float | None = None) -> list[dict]:
-    now = now or time.time()
+def collect_with_warnings(claude_dir: Path, codex_dir: Path, hours: int, home: Path, now: float | None = None) -> tuple[list[dict], list[str]]:
+    now = time.time() if now is None else now
     cutoff = now - hours * 3600
     grouped: dict[str, dict] = {}
     warnings: list[str] = []
@@ -152,7 +151,11 @@ def collect(claude_dir: Path, codex_dir: Path, hours: int, home: Path, now: floa
             "last_assistant": truncate(assistants[-1][1], ASSISTANT_CHARS) if assistants else "",
         })
     repos.sort(key=lambda r: r["last_active"], reverse=True)
-    collect.warnings = warnings  # exposed for main(); tests call collect() directly
+    return repos, warnings
+
+
+def collect(claude_dir: Path, codex_dir: Path, hours: int, home: Path, now: float | None = None) -> list[dict]:
+    repos, _ = collect_with_warnings(claude_dir, codex_dir, hours, home, now)
     return repos
 
 
@@ -185,8 +188,7 @@ def main():
 
     claude_dir = args.claude_dir or args.home / ".claude" / "projects"
     codex_dir = args.codex_dir or args.home / ".codex" / "sessions"
-    repos = collect(claude_dir, codex_dir, args.hours, args.home)
-    warnings = getattr(collect, "warnings", [])
+    repos, warnings = collect_with_warnings(claude_dir, codex_dir, args.hours, args.home)
     if args.json:
         print(json.dumps({"repos": repos, "warnings": warnings}, indent=2))
     else:
