@@ -30,8 +30,16 @@ class ConnectorSendTests(unittest.TestCase):
 
     def test_create_chat_and_channel_post_blocked(self):
         for name in ("teams_create_chat", "teams_send_channel_message", "teams_reply_channel_message",
-                     "outlook_send_draft", "outlook_forward_mail"):
+                     "outlook_send_draft", "outlook_forward_mail",
+                     "outlook_respond_to_event", "outlook_set_vacation", "outlook_delete_event"):
             self.assertEqual(run_hook(M365 + name, {})["decision"], "block", name)
+
+    def test_event_with_attendees_blocked_without_attendees_allowed(self):
+        out = run_hook(M365 + "outlook_create_event", {"attendees": ["x@y.com"]})
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("Calendar invite", out["reason"])
+        self.assertEqual(run_hook(M365 + "outlook_create_event", {"attendees": []})["decision"], "allow")
+        self.assertEqual(run_hook(M365 + "outlook_create_event", {"subject": "x"})["decision"], "allow")
 
     def test_read_tools_still_allowed(self):
         self.assertEqual(run_hook(M365 + "chat_message_search", {"query": "*"}), {"decision": "allow"})

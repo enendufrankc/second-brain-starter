@@ -37,7 +37,11 @@ ALWAYS_BLOCK_SUFFIXES = (
     "outlook_send_mail",
     "outlook_send_draft",
     "outlook_forward_mail",
+    "outlook_respond_to_event",
+    "outlook_set_vacation",
+    "outlook_delete_event",
 )
+EVENT_WRITE_SUFFIXES = ("outlook_create_event", "outlook_update_event")
 
 
 def check_connector_send(tool_name: str, tool_input: dict) -> dict | None:
@@ -46,6 +50,11 @@ def check_connector_send(tool_name: str, tool_input: dict) -> dict | None:
         if tool_input.get("chatId") == SELF_CHAT_ID:
             return {"decision": "allow"}
         return {"decision": "block", "reason": "Teams send only allowed to Frank's notes-to-self chat"}
+    if tool_name.endswith(EVENT_WRITE_SUFFIXES):
+        attendees = tool_input.get("attendees")
+        if isinstance(attendees, list) and attendees:
+            return {"decision": "block", "reason": "Calendar invite to other people blocked by guardrail"}
+        return None
     if tool_name.endswith(ALWAYS_BLOCK_SUFFIXES):
         short = tool_name.rsplit("__", 1)[-1]
         return {"decision": "block", "reason": f"Outbound send blocked by guardrail ({short})"}
