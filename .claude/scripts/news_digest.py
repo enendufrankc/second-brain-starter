@@ -11,7 +11,6 @@ Usage:
 
 import argparse
 import json
-import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -120,8 +119,7 @@ def format_markdown(items: list[dict], warnings: list[str], hours: int) -> str:
                 lines.append(f"- {item['published'].isoformat()} | {item['title']} | {item['link']}")
         lines.append("")
     if warnings:
-        lines.append("Warnings:")
-        lines.extend(f"- {w}" for w in warnings)
+        lines.extend(f"Warning: {w}" for w in warnings)
     return "\n".join(lines).rstrip()
 
 
@@ -132,7 +130,7 @@ def collect(hours: int) -> tuple[list[dict], list[str]]:
         try:
             all_items.extend(parse_feed(fetch(url), name))
         except Exception as exc:  # network and parse errors are both just a skipped feed
-            warnings.append(f"{name}: {exc.__class__.__name__}: {str(exc)[:80]}")
+            warnings.append(f"{name}: {exc.__class__.__name__}: {' '.join(str(exc).split())[:80]}")
     return filter_recent(all_items, hours), warnings
 
 

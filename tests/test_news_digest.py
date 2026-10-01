@@ -1,5 +1,5 @@
 import sys, unittest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".claude" / "scripts"))
@@ -57,7 +57,13 @@ class FormatTests(unittest.TestCase):
         out = nd.format_markdown(items, ["Z: HTTPError 403"], 24)
         self.assertIn("## X\n- 2026-10-01T06:00:00+00:00 | New model | https://ex.com/a", out)
         self.assertIn("## Y\n- 2026-10-01T07:30:00+00:00 | Atom entry | https://ex.org/p", out)
-        self.assertTrue(out.rstrip().endswith("Warnings:\n- Z: HTTPError 403"))
+        self.assertTrue(out.rstrip().endswith("Warning: Z: HTTPError 403"))
+
+    def test_no_items_with_warnings_keeps_no_items_line_first(self):
+        out = nd.format_markdown([], ["Z: HTTPError 403"], 24)
+        self.assertEqual(out, "No items in the last 24 h.\nWarning: Z: HTTPError 403")
+        for line in out.split("\n"):
+            self.assertFalse(line.startswith("- "))
 
 
 if __name__ == "__main__":
