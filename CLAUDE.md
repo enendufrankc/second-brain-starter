@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Frank's personal AI "second brain": an Obsidian markdown vault (`vault/`) plus Python scripts, Claude Code hooks, and skills that give the agent persistent memory, proactive monitoring, and read-only integrations with Ballys GitLab, Teams, and Outlook. It started as a fork of `coleam00/second-brain-starter`; the README describes the generic starter and the `create-second-brain-prd` skill, not this customised build. `vault/BUILD-PLAN.md` is the live roadmap and `docs/superpowers/plans/` holds the phase 1–3 implementation plans.
 
-There is no app to build and no test suite. Everything is a `python3` CLI run from the repo root. "Done" means the relevant script ran and produced the expected output.
+There is no app to build. The only tests are the unittest suite under tests/ for the morning-brief scripts and the guardrail hook. Everything is a `python3` CLI run from the repo root. "Done" means the relevant script ran and produced the expected output.
 
 ## Commands
 
@@ -31,6 +31,22 @@ Proactive systems:
 python3 .claude/scripts/heartbeat.py [--check teams|gitlab|outlook|habits|drafts] [--json] [--quiet]
 python3 .claude/scripts/memory_reflect.py [--date YYYY-MM-DD] [--archive] [--dry-run]
 python3 .claude/scripts/draft_manager.py status|expire|list|create|mark-sent <file>
+```
+
+Morning brief (launchd ticks every 10 min; gate is weekday, 06:30–11:00, not sent today, VPN up):
+
+```bash
+bash .claude/scripts/morning_brief.sh --force        # run now regardless of gate (VPN still required)
+MB_SKIP_CLAUDE=1 bash .claude/scripts/morning_brief.sh --force   # gather only, no send
+python3 .claude/scripts/sessions_digest.py --hours 36
+python3 .claude/scripts/news_digest.py --hours 24
+tail -f .claude/data/logs/morning-brief.log
+```
+
+Tests (unittest, no pytest installed):
+
+```bash
+python3 -m unittest discover -s tests -v
 ```
 
 Integrations (CLI wrapper pattern: the LLM calls these, never touches tokens):
