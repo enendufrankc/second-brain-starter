@@ -69,7 +69,7 @@ mcp__claude_ai_Microsoft_365__outlook_calendar_search,\
 mcp__claude_ai_Microsoft_365__teams_send_chat_message"
 ```
 
-The prompt receives the run dir path and today's date via environment variables `MB_RUN_DIR` and `MB_DATE`, which the prompt text references.
+The shell substitutes `{{RUN_DIR}}`, `{{DATE}}` and `{{NOW}}` into the prompt text before passing it to `claude -p`; the headless run has no shell access to read environment variables. The `--max-turns` flag is omitted because this CLI version does not have it.
 
 Mark: if `claude` exits 0 and its stdout contains the literal `BRIEF_SENT`, write the marker. Otherwise log the failure and leave no marker, so the next tick retries until 11:00. The prompt also tells Claude to write the marker itself immediately after a successful send, so a crash after sending cannot cause a duplicate post.
 
@@ -123,9 +123,9 @@ The instructions for the headless run. Steps, in order:
 
 1. Read `MB_RUN_DIR/digest.md`, `MB_RUN_DIR/gitlab.md`, `MB_RUN_DIR/news.md`, the `## Critical Deadlines` section of `vault/MEMORY.md`, and `vault/daily/MB_DATE.md` if it exists.
 2. Read `.claude/data/state/morning-brief-state.json` (`{"last_dump_ts": ISO-8601}`; treat a missing file as 24 h ago).
-3. Read the three team chats since yesterday 06:00 via `read_resource` on `teams:///chats/<id>/messages`; if that resource is unavailable, fall back to `chat_message_search` with `afterDateTime` and keep only results from those three chats.
+3. Read the three team chats since yesterday 06:00 via `chat_message_search` with `afterDateTime`, keeping only results from those three chat ids. `read_resource` reads one message by id and is used only to expand a truncated message.
 4. Read today's calendar via `outlook_calendar_search`.
-5. Read the self-chat since `last_dump_ts`. Ignore messages the agent posted. For each message from Frank: if it starts with `todo:` (case-insensitive), it is a to-do candidate; otherwise append `- HH:MM | <text>` to `vault/left-brain/ballys/inbox/MB_DATE.md`, passing the text through `python3 .claude/scripts/sanitize.py --source teams` first. Create the file with a one-line header if absent.
+5. Read the self-chat since `last_dump_ts`. The agent's own posts are authored by Frank's account, so they are excluded two ways: every agent message ends with the trailer `— second brain`, and `last_dump_ts` is advanced to the send time in step 10. For each message from Frank: if it starts with `todo:` (case-insensitive), it is a to-do candidate; otherwise append `- HH:MM | <text>` to `vault/left-brain/ballys/inbox/MB_DATE.md`, passing the text through `python3 .claude/scripts/sanitize.py --source teams` first. Create the file with a one-line header if absent.
 6. Compose the brief. Pick at most five actions in this priority order: asks aimed at Frank in the three chats in the last 48 h; the next step left open in yesterday's sessions; prep for today's meetings; MEMORY.md deadlines. Drop anything silent for 14 days unless mentioned in the last 48 h. GitLab data is evidence only and never promotes an item on its own. Every line names a concrete action, the project, and a two-word source.
 7. Send it with `teams_send_chat_message` to the self-chat id, `bodyType` text. Shape:
 
