@@ -2,6 +2,8 @@
 # Morning brief runner. Design: docs/superpowers/specs/2026-10-01-morning-brief-design.md
 # launchd calls this every 10 minutes. It exits fast unless the gate passes,
 # then gathers inputs and runs one headless Claude session that posts to Teams.
+# Environment: MB_STATE_DIR, MB_DATE, MB_FAKE_NOW, MB_FAKE_NOW_ISO, MB_FAKE_DOW, MB_SKIP_VPN,
+# MB_SKIP_CLAUDE (dry-run), MB_SKIP_GATHER (test mode: skip collectors), MB_CLAUDE_BIN, MB_CLAUDE_TIMEOUT
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -45,18 +47,25 @@ mkdir -p "$RUN_DIR"
 find "$STATE_DIR" -path "$STATE_DIR/run-*" -type f -mtime +7 -delete 2>/dev/null || true
 find "$STATE_DIR" -mindepth 1 -maxdepth 1 -type d -name 'run-*' ! -name "run-$TODAY" -empty -delete 2>/dev/null || true
 
-log "gather: sessions digest"
-python3 .claude/scripts/sessions_digest.py --hours 36 > "$RUN_DIR/digest.md" 2>>"$RUN_DIR/gather.err" \
-  || echo "Session digest unavailable." > "$RUN_DIR/digest.md"
+if [[ "${MB_SKIP_GATHER:-0}" == "1" ]]; then
+  log "gather: skipped (test mode)"
+  echo "Sessions digest (test mode)." > "$RUN_DIR/digest.md"
+  echo "GitLab issues (test mode)." > "$RUN_DIR/gitlab.md"
+  echo "- AI news (test mode)." > "$RUN_DIR/news.md"
+else
+  log "gather: sessions digest"
+  python3 .claude/scripts/sessions_digest.py --hours 36 > "$RUN_DIR/digest.md" 2>>"$RUN_DIR/gather.err" \
+    || echo "Session digest unavailable." > "$RUN_DIR/digest.md"
 
-log "gather: gitlab"
-python3 .claude/scripts/integrations/gitlab_integration.py issues > "$RUN_DIR/gitlab.md" 2>>"$RUN_DIR/gather.err" \
-  || echo "GitLab unavailable: check GITLAB_PAT." > "$RUN_DIR/gitlab.md"
+  log "gather: gitlab"
+  python3 .claude/scripts/integrations/gitlab_integration.py issues > "$RUN_DIR/gitlab.md" 2>>"$RUN_DIR/gather.err" \
+    || echo "GitLab unavailable: check GITLAB_PAT." > "$RUN_DIR/gitlab.md"
 
-log "gather: news"
-if ! python3 .claude/scripts/news_digest.py --hours 24 > "$RUN_DIR/news.md" 2>>"$RUN_DIR/gather.err" \
-   || ! grep -q '^- ' "$RUN_DIR/news.md"; then
-  echo "AI news unavailable." > "$RUN_DIR/news.md"
+  log "gather: news"
+  if ! python3 .claude/scripts/news_digest.py --hours 24 > "$RUN_DIR/news.md" 2>>"$RUN_DIR/gather.err" \
+     || ! grep -q '^- ' "$RUN_DIR/news.md"; then
+    echo "AI news unavailable." > "$RUN_DIR/news.md"
+  fi
 fi
 
 if [[ "${MB_SKIP_CLAUDE:-0}" == "1" ]]; then
@@ -66,21 +75,29 @@ fi
 
 if [[ ! -x "$CLAUDE_BIN" ]]; then log "fail: claude binary not found at $CLAUDE_BIN"; exit 1; fi
 
+if [[ ! -f "$PROMPT_FILE" ]]; then log "fail: prompt file not found at $PROMPT_FILE"; exit 1; fi
+
 prompt="$(sed -e "s|{{RUN_DIR}}|$RUN_DIR|g" -e "s|{{DATE}}|$TODAY|g" -e "s|{{NOW}}|$NOW_HM|g" -e "s|{{NOW_ISO}}|$NOW_ISO|g" "$PROMPT_FILE")"
 
-log "run: claude -p"
+CLAUDE_TIMEOUT="${MB_CLAUDE_TIMEOUT:-900}"
+log "run: claude -p (timeout ${CLAUDE_TIMEOUT}s)"
 set +e
-out="$("$CLAUDE_BIN" -p "$prompt" --output-format text \
-  --allowedTools "Read" "Write" "Edit" "Bash(python3 .claude/scripts/sanitize.py:*)" \
-    "WebFetch(domain:www.anthropic.com)" \
-    "mcp__claude_ai_Microsoft_365__chat_message_search" \
-    "mcp__claude_ai_Microsoft_365__read_resource" \
-    "mcp__claude_ai_Microsoft_365__outlook_calendar_search" \
-    "mcp__claude_ai_Microsoft_365__teams_send_chat_message" \
-  2>>"$RUN_DIR/claude.err")"
-rc=$?
-set -e
-printf '%s\n' "$out" > "$RUN_DIR/claude.out"
+{
+  "$CLAUDE_BIN" -p "$prompt" --output-format text \
+    --allowedTools "Read" "Write" "Edit" "Bash(python3 .claude/scripts/sanitize.py:*)" \
+      "WebFetch(domain:www.anthropic.com)" \
+      "mcp__claude_ai_Microsoft_365__chat_message_search" \
+      "mcp__claude_ai_Microsoft_365__read_resource" \
+      "mcp__claude_ai_Microsoft_365__outlook_calendar_search" \
+      "mcp__claude_ai_Microsoft_365__teams_send_chat_message" \
+    </dev/null >"$RUN_DIR/claude.out" 2>>"$RUN_DIR/claude.err" &
+  claude_pid=$!
+  ( sleep "$CLAUDE_TIMEOUT"; kill -9 "$claude_pid" 2>/dev/null && echo "watchdog: killed claude after ${CLAUDE_TIMEOUT}s" >>"$RUN_DIR/claude.err" ) >/dev/null 2>&1 &
+  wait "$claude_pid"
+  rc=$?
+  set -e
+  out="$(cat "$RUN_DIR/claude.out")"
+}
 
 if (( rc == 0 )) && grep -q 'BRIEF_SENT' <<<"$out"; then
   touch "$MARKER"
