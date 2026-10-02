@@ -18,6 +18,7 @@ NOW_HHMM="${MB_FAKE_NOW:-$(date +%H%M)}"
 NOW_HM="${NOW_HHMM:0:2}:${NOW_HHMM:2:2}"
 NOW_ISO="${MB_FAKE_NOW_ISO:-$(date +%Y-%m-%dT%H:%M:%S%z | sed 's/\(..\)$/:\1/')}"
 DOW="${MB_FAKE_DOW:-$(date +%u)}"
+WEEKDAY="$(date +%A)"
 PROBE_URL="${MB_PROBE_URL:-https://gitlab.ballys.tech/api/v4/version}"
 CLAUDE_BIN="${MB_CLAUDE_BIN:-$HOME/.local/bin/claude}"
 MARKER="$STATE_DIR/morning-brief-sent-$TODAY"
@@ -79,7 +80,7 @@ if [[ ! -x "$CLAUDE_BIN" ]]; then log "fail: claude binary not found at $CLAUDE_
 
 if [[ ! -f "$PROMPT_FILE" ]]; then log "fail: prompt file not found at $PROMPT_FILE"; exit 1; fi
 
-prompt="$(sed -e "s|{{RUN_DIR}}|$RUN_DIR|g" -e "s|{{STATE_DIR}}|$STATE_DIR|g" -e "s|{{DATE}}|$TODAY|g" -e "s|{{NOW}}|$NOW_HM|g" -e "s|{{NOW_ISO}}|$NOW_ISO|g" "$PROMPT_FILE")"
+prompt="$(sed -e "s|{{RUN_DIR}}|$RUN_DIR|g" -e "s|{{STATE_DIR}}|$STATE_DIR|g" -e "s|{{DATE}}|$TODAY|g" -e "s|{{NOW}}|$NOW_HM|g" -e "s|{{NOW_ISO}}|$NOW_ISO|g" -e "s|{{WEEKDAY}}|$WEEKDAY|g" "$PROMPT_FILE")"
 
 CLAUDE_TIMEOUT="${MB_CLAUDE_TIMEOUT:-900}"
 log "run: claude -p (timeout ${CLAUDE_TIMEOUT}s)"
