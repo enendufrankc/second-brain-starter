@@ -73,6 +73,35 @@ class GateTests(unittest.TestCase):
         self.assertEqual(rc, 0); self.assertIn("skip: VPN down (probe 000)", out)
 
 
+class AttemptCapTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = {"MB_STATE_DIR": self.tmp.name, "MB_DATE": "2026-10-01", "MB_SKIP_VPN": "1",
+                     "MB_FAKE_DOW": "3", "MB_FAKE_NOW": "0800", "MB_SKIP_GATHER": "1",
+                     "MB_CLAUDE_BIN": str(ROOT / "tests" / "fake_claude.sh"), "FAKE_CLAUDE_MODE": "fail"}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_failed_run_increments_attempts(self):
+        rc, out = run(self.base)
+        self.assertEqual(rc, 1)
+        self.assertEqual(Path(self.tmp.name, "morning-brief-attempts-2026-10-01").read_text().strip(), "1")
+        self.assertIn("attempt 1/3", out)
+
+    def test_attempts_exhausted_skips_without_running(self):
+        Path(self.tmp.name, "morning-brief-attempts-2026-10-01").write_text("3\n")
+        rc, out = run(self.base)
+        self.assertEqual(rc, 0)
+        self.assertIn("skip: attempts exhausted (3)", out)
+        self.assertNotIn("run: claude", out)
+
+    def test_force_ignores_attempt_cap(self):
+        Path(self.tmp.name, "morning-brief-attempts-2026-10-01").write_text("3\n")
+        rc, out = run(self.base, "--force")
+        self.assertIn("run: claude", out)
+
+
 class ClaudeRunTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

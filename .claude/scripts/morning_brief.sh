@@ -22,6 +22,8 @@ WEEKDAY="$(date +%A)"
 PROBE_URL="${MB_PROBE_URL:-https://gitlab.ballys.tech/api/v4/version}"
 CLAUDE_BIN="${MB_CLAUDE_BIN:-$HOME/.local/bin/claude}"
 MARKER="$STATE_DIR/morning-brief-sent-$TODAY"
+ATTEMPTS_FILE="$STATE_DIR/morning-brief-attempts-$TODAY"
+MAX_ATTEMPTS="${MB_MAX_ATTEMPTS:-3}"
 RUN_DIR="$STATE_DIR/run-$TODAY"
 PROMPT_FILE="$SCRIPT_DIR/morning_brief_prompt.md"
 
@@ -36,6 +38,8 @@ if (( FORCE == 0 )); then
   if (( DOW >= 6 )); then log "skip: weekend"; exit 0; fi
   if (( 10#$NOW_HHMM < 630 || 10#$NOW_HHMM > 1100 )); then log "skip: outside window ($NOW_HHMM)"; exit 0; fi
   if [[ -e "$MARKER" ]]; then log "skip: already sent today"; exit 0; fi
+  attempts=0; [[ -f "$ATTEMPTS_FILE" ]] && attempts="$(tr -dc '0-9' < "$ATTEMPTS_FILE")"
+  if (( ${attempts:-0} >= MAX_ATTEMPTS )); then log "skip: attempts exhausted (${attempts})"; exit 0; fi
 fi
 
 if [[ "${MB_SKIP_VPN:-0}" != "1" ]]; then
@@ -83,7 +87,9 @@ if [[ ! -f "$PROMPT_FILE" ]]; then log "fail: prompt file not found at $PROMPT_F
 prompt="$(sed -e "s|{{RUN_DIR}}|$RUN_DIR|g" -e "s|{{STATE_DIR}}|$STATE_DIR|g" -e "s|{{DATE}}|$TODAY|g" -e "s|{{NOW}}|$NOW_HM|g" -e "s|{{NOW_ISO}}|$NOW_ISO|g" -e "s|{{WEEKDAY}}|$WEEKDAY|g" "$PROMPT_FILE")"
 
 CLAUDE_TIMEOUT="${MB_CLAUDE_TIMEOUT:-900}"
-log "run: claude -p (timeout ${CLAUDE_TIMEOUT}s)"
+attempts=0; [[ -f "$ATTEMPTS_FILE" ]] && attempts="$(tr -dc '0-9' < "$ATTEMPTS_FILE")"
+echo $(( ${attempts:-0} + 1 )) > "$ATTEMPTS_FILE"
+log "run: claude -p (timeout ${CLAUDE_TIMEOUT}s, attempt $(( ${attempts:-0} + 1 ))/${MAX_ATTEMPTS})"
 set +e
 {
   "$CLAUDE_BIN" -p "$prompt" --output-format text \
