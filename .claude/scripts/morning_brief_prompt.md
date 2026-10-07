@@ -38,10 +38,10 @@ For each remaining message, numbered n = 1, 2, ...:
 3. If the sanitized text starts with `todo:` (case-insensitive), strip the prefix and append the remainder as one line to `{{RUN_DIR}}/todos.md` (header: none).
 4. Otherwise append `- HH:MM | <sanitized text>` to `vault/left-brain/ballys/inbox/{{DATE}}.md` (header: `# Inbox — {{DATE}}` then a blank line). Never add these to the to-do list.
 Count the inbox lines you appended this run as `k`.
-Then immediately Write `{{STATE_DIR}}/morning-brief-state.json` as `{"last_dump_ts": "<cursor>"}` where `<cursor>` is the LATER of `{{NOW_ISO}}` and the newest captured message's created time. If paging stopped because the 100-message cap was reached before results were exhausted, do NOT advance the cursor: keep the old `last_dump_ts` and add `dumps: capture truncated, cursor held` to the brief's `Watch` line. Do this before anything is sent, so a failed send never re-captures these dumps.
+Then immediately Write `{{STATE_DIR}}/morning-brief-state.json` as `{"last_dump_ts": "<cursor>"}` where `<cursor>` is the LATER of `{{NOW_ISO}}` and the newest captured message's created time. If paging stopped because the 100-message cap was reached before results were exhausted, do NOT advance the cursor: keep the old `last_dump_ts` and note `dumps: capture truncated, cursor held` in the daily-log section. Do this before anything is sent, so a failed send never re-captures these dumps.
 
 ## Step 5 — Select AI news (do not send yet)
-From `news.md`, pick three to five items that are launches, model releases, API or pricing changes. Ignore opinion pieces. Primary vendor sources outrank press. Also fetch `https://www.anthropic.com/news` with WebFetch and include any Anthropic announcement from the last 24 h. Remember the selection as `news_items`. If nothing qualifies, `news_items` is empty.
+From `news.md`, pick at most three items that are launches, model releases, API or pricing changes. Ignore opinion pieces. Primary vendor sources outrank press. Also fetch `https://www.anthropic.com/news` with WebFetch and include any Anthropic announcement from the last 24 h. Remember the selection as `news_items`. If nothing qualifies, `news_items` is empty.
 
 ## Step 6 — Compose the to-do brief
 Choose at most five actions, in this priority order:
@@ -50,21 +50,25 @@ Choose at most five actions, in this priority order:
 3. To-do candidates from `todos.md` (Step 1) and Step 4.
 4. Preparation for today's meetings.
 5. MEMORY.md Critical Deadlines.
-Drop anything silent for 14 days unless someone mentioned it in the last 48 h. Each line names one concrete action, the project, and a short source in parentheses. Work only: no personal items. Skip MEMORY.md deadlines about life insurance, personal finance, health or family even though they appear under Critical Deadlines.
+Drop anything silent for 14 days unless someone mentioned it in the last 48 h. Work only: no personal items.
+
+Write for a 5-second glance:
+- Each to-do starts with a verb and is at most 10 words. Name the person or project only if needed to act. No sources, ticket context or explanations in the message; those go in the daily-log Evidence section.
+- "Reply" items (someone is waiting on Frank) go first and say who: "Reply to Al: lightning-talk slot 16 Oct".
+- Anything with a deadline in the next 5 days gets its own "Due soon" line with the day, e.g. "AI Planner #4 + #5 — Fri". Skip MEMORY.md deadlines about life insurance, personal finance, health or family even though they appear under Critical Deadlines.
 
 Message body is HTML (Teams collapses newlines in plain text). Use exactly this structure, at most five list items:
 ```
-<p><strong>{{WEEKDAY}} <d> <Mon></strong></p>
+<p><strong>{{WEEKDAY}} <d> <Mon> — <n> things today</strong></p>
 <ol>
-<li><action> — <project> (<source>)</li>
+<li><verb-first action, ≤10 words></li>
 <li>...</li>
 </ol>
-<p><strong>Meetings:</strong> <HH:MM subject> · <HH:MM subject></p>
-<p><strong>Watch:</strong> GitLab <open> open, <overdue> overdue · <one FYI line, or "AI news: no items" when news_items is empty></p>
-<p>Captured <k> notes</p>
+<p><strong>Due soon:</strong> <item> — <day> · <item> — <day></p>
+<p><strong>Meetings:</strong> <HH:MM short name> · <HH:MM short name></p>
 <p>— second brain</p>
 ```
-Omit the `Captured` paragraph when k is 0. Omit the `Meetings` paragraph when there are none. Keep the final `— second brain` paragraph always. Use only p, strong, ol, li, a tags.
+Omit `Due soon` when nothing is due in the next 5 days. Omit `Meetings` when there are none. No Watch line, no GitLab counts, no "Captured" line in the message; put those in the daily-log section instead. Keep the final `— second brain` paragraph always. Use only p, strong, ol, li, a tags.
 
 ## Step 7 — Send the brief, then mark
 Call `teams_send_chat_message` with `chatId` = SELF_CHAT, `bodyType: "html"`, `body` = the HTML message. If the call fails, print `BRIEF_FAILED <reason>` as your final line and stop. Do not write the marker.
