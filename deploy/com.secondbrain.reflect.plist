@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.secondbrain.reflect</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/frank.enendu/Documents/Personal/Second Brain Starter/.claude/scripts/memory_reflect.py</string>
+        <string>--archive</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/frank.enendu/Documents/Personal/Second Brain Starter/.claude/data/logs/reflect.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/frank.enendu/Documents/Personal/Second Brain Starter/.claude/data/logs/reflect-error.log</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/frank.enendu/Documents/Personal/Second Brain Starter</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+</dict>
+</plist>

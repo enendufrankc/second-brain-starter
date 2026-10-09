@@ -1,2 +1,13 @@
-fastembed>=0.3.0
-sqlite-vec>=0.1.0
+# Second Brain — Python Dependencies
+# Install: pip install -r requirements.txt --break-system-packages
+
+# Phase 3: Memory Search (Hybrid RAG)
+fastembed>=0.3.0          # ONNX embeddings (sentence-transformers/all-MiniLM-L6-v2)
+sqlite-vec>=0.1.0         # Vector search extension for SQLite
+
+# Phase 4: Microsoft Graph Integrations (Teams, Outlook, Calendar)
+msal>=1.24.0              # Microsoft Authentication Library (Device Code Flow)
+
+# Optional: enhanced features
+# python-gitlab>=4.0.0    # Alternative GitLab SDK (we use urllib instead)
+# anthropic>=0.30.0       # Claude API (for future Agent SDK integration)
